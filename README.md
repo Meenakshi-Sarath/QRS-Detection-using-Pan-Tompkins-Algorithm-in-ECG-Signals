@@ -10,3 +10,6 @@ BLOCK DIAGRAM OF MODULES ON VIVADO FOR FPGA IMPLEMENTATION
 
 <img width="600" height="506" alt="image" src="https://github.com/user-attachments/assets/7f11227c-d8c9-40ac-8b05-99a638773e2b" />
 
+NOW MODULES 
+
+1) The first module stores ECG samples in ROM and releases one sample at a time at 360 Hz using a sample clock, emulating real-time ECG acquisition.
