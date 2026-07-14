@@ -1,15 +1,104 @@
+ECG R-Peak Detection, Heart Rate & Arrhythmia Classification (Verilog)
 
-<img width="1823" height="816" alt="image" src="https://github.com/user-attachments/assets/cbf9d303-92ad-42e9-a0cb-38290cf6e6bd" />
+A hardware implementation of the Pan-Tompkins QRS detection algorithm in
+Verilog, taking a raw single-lead ECG signal through a filter pipeline to
+detect heartbeats, compute instantaneous heart rate, and classify basic
+rhythm abnormalities (bradycardia, tachycardia, irregular rhythm).
 
-BLOCK DIAGRAM OF MODULES ON VIVADO FOR FPGA IMPLEMENTATION
-      <img width="600" height="527" alt="image" src="https://github.com/user-attachments/assets/aa58cf00-f439-48cd-85b7-843e0deccbeb" />
-      
-<img width="600" height="525" alt="image" src="https://github.com/user-attachments/assets/fd42ba66-3d8b-4200-9811-8eb06b19be1e" />
+Verified against real ECG recordings from the MIT-BIH Arrhythmia Database.
 
-<img width="600" height="589" alt="image" src="https://github.com/user-attachments/assets/2585e50c-c750-4bba-aea1-a2b8afcb749f" />
+Pipeline
 
-<img width="600" height="506" alt="image" src="https://github.com/user-attachments/assets/7f11227c-d8c9-40ac-8b05-99a638773e2b" />
+ecg_rom -> lpf -> hpf -> derivative -> squaring -> mwi -> peak_detect
+         -> heart_rate -> arrhythmia_classify
 
-NOW MODULES 
+StagePurposeecg_romSample source (ROM-based stand-in for a live ADC feed)lpfLow-pass filter — removes high-frequency noisehpfHigh-pass filter — removes baseline wander / DC offsetderivativeAmplifies steep slopes characteristic of the QRS complexsquaringNonlinear amplification, emphasizes true QRS energymwiMoving window integrator — smooths into a QRS-width energy pulsepeak_detectAdaptive-threshold R-peak detection with refractory lockoutheart_rateConverts peak-to-peak timing into BPMarrhythmia_classifyRule-based rhythm classification (NORMAL / BRADYCARDIA / TACHYCARDIA / IRREGULAR)
 
-1) The first module stores ECG samples in ROM and releases one sample at a time at 360 Hz using a sample clock, emulating real-time ECG acquisition.
+Full block diagram and design rationale: see docs/ (or inline module
+comments — each module's header explains what it computes and why).
+
+Repo structure
+
+rtl/                  design sources (ecg_rom.v, lpf.v, hpf.v, ...)
+tb/                   per-module self-checking testbenches + tb_ecg_top.v
+sim/                  ecg.mem test vectors, MATLAB scripts that generate them
+docs/                 block diagrams, design notes
+
+(Adjust to match your actual Vivado project layout — the important part is
+separating design sources from testbenches from test data.)
+
+Verification approach
+
+Every module has an independent, self-checking testbench — no manual
+waveform inspection required. Each testbench builds its own reference
+model (not copy-pasted from the DUT) and asserts a PASS/FAIL with a
+mismatch count.
+
+
+Unit level: lpf, hpf, derivative, squaring, mwi,
+peak_detect, heart_rate, arrhythmia_classify — each verified in
+isolation against directed test cases, impulse/step responses where
+applicable, and randomized regression.
+Integration level: tb_ecg_top.v runs the full chain against real
+MIT-BIH data (ecg.mem) and checks end-to-end behavior — R-peak
+spacing tracks the real signal (not a fixed cadence), reported HR falls
+in a physiologically plausible range, and rhythm classification
+produces real output.
+
+
+A real finding worth knowing about
+
+Two of the filter stages (lpf, hpf) were originally implemented as
+recursive/IIR-style difference equations, matching the textbook
+Pan-Tompkins formulas. Both passed unit testing with random and directed
+inputs. Both failed on real ECG data — not because the equations were
+wrong, but because realizing a marginal-stability, repeated-pole-at-DC
+filter recursively is numerically fragile: small per-cycle truncation
+(hpf) or even just correlated real input (lpf) caused the recursive
+state to diverge over hundreds of samples, corrupting every downstream
+stage. Confirmed via a "wide shadow register" technique — running the
+same computation in parallel with an oversized (64-bit) accumulator to
+distinguish genuine overflow from genuine algorithmic instability.
+
+Fixed by re-deriving each filter's exact FIR-equivalent form (bounded
+windowed sums, no feedback path) — same intended frequency response,
+provably can't diverge. See comments at the top of lpf.v / hpf.v for
+the full derivation.
+
+This is a good illustration of why integration testing with realistic
+data matters even when every unit test passes — a unit test built on a
+reference model of the same (possibly flawed) formula will happily
+agree with a flawed DUT forever.
+
+Running the tests
+
+Each tb_<module>.v is self-contained — pair it with its matching
+<module>.v as simulation sources, set the testbench as the simulation
+top, run, and check the console/Tcl output for PASS/FAIL.
+
+For tb_ecg_top.v, also add ecg.mem to the simulation working
+directory (generated by sim/generate_ecg_mem.m — see script for the
+MATLAB → MIT-BIH → 200Hz resampling pipeline). Note: clk_freq is
+overridden to a small value in the testbench purely for simulation
+speed; use the real target frequency (default 100MHz) for synthesis.
+
+Known limitations / possible extensions
+
+
+Single-lead only.
+peak_detect requires a quiet ~1.3s warm-up window to calibrate its
+adaptive threshold before trusting detections.
+Arrhythmia classification is simple threshold/rule-based, not
+validated against clinical sensitivity/precision metrics (a companion
+MATLAB reference implementation computes those against PhysioNet
+annotations — see sim/).
+No explicit lead-off / motion-artifact detection.
+
+
+Background
+
+Based on: Pan J, Tompkins WJ. A Real-Time QRS Detection Algorithm.
+IEEE Trans Biomed Eng. 1985.
+
+Test data: MIT-BIH Arrhythmia Database (PhysioNet).
+Contentecg.memmemecg.memmemexcerpt_from_previous_claude_message.txt1 linetxtexcerpt_from_previous_claude_message.txt1 linetxtexcerpt_from_previous_claude_message.txt1 linetxtexcerpt_from_previous_claude_message.txt1 linetxtexcerpt_from_previous_claude_message.txt1 linetxt
