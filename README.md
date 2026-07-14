@@ -49,7 +49,7 @@ ecg-fpga/ <br>
 ├── sim/ <br>
 |   ├── generate_ecg_mem.m <br>
 |   └── ecg.mem <br>
-└── docs/                 block diagrams, design notes <br>
+├── docs/                 <br>
 |   ├── FILL IN <br>
 |   └── FILL IN  <br>
 └──
