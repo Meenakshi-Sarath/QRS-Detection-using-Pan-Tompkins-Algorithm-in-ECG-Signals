@@ -1,3 +1,4 @@
 # ALGORTIHM OVERVIEW 
+
 This project implements the Pan-Tompkins algorithm (Pan J, Tompkins WJ, A Real-Time QRS Detection Algorithm, IEEE Trans 
- Biomed Eng, 1985) in Verilog. This doc explains why the pipeline is shaped the way it is.
+Biomed Eng, 1985) in Verilog. This doc explains why the pipeline is shaped the way it is.
