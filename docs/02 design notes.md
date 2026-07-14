@@ -39,7 +39,7 @@ or the reference will disagree with a correct DUT.
 Every stage grows its output width relative to its input, to avoid overflow from that stage's own gain:
 
 | Stage | Output width (relative to data_width, default 16) | Why |
-| --- | --- |
+| --- | --- | --- |
 | ecg_rom | data_width (16 bits) | Raw sample, no processing | 
 | lpf | data_width+6 (22 bits) | ~36x DC gain (derived from the filter's transfer function at DC: H(1) = 6² = 36, since it's the square of a 6-tap boxcar) | 
 | hpf | data_width+8 (24 bits) | Small additional headroom over lpf's output | 
