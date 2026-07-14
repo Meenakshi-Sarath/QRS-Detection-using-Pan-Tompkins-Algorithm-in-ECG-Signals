@@ -6,7 +6,8 @@ without having to re-derive anything.
 
 ## Bug 1: lpf numerically diverges on real ECG data
 
-### Symptom: lpf passed its own unit test (randomized + directed
+### Symptom: 
+lpf passed its own unit test (randomized + directed
 inputs, bit-exact match against an independent reference model). But when the full pipeline ran against real MIT-BIH data, 
 lpf_out swung wildly (millions in magnitude, alternating sign) even when the input was nearly flat.
 
