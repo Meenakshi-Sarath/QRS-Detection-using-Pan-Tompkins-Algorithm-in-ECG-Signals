@@ -1,4 +1,4 @@
-ECG R-Peak Detection, Heart Rate & Arrhythmia Classification (Verilog)
+# ECG R-Peak Detection, Heart Rate & Arrhythmia Classification (Verilog)
 
 A hardware implementation of the Pan-Tompkins QRS detection algorithm in
 Verilog, taking a raw single-lead ECG signal through a filter pipeline to
@@ -7,45 +7,67 @@ rhythm abnormalities (bradycardia, tachycardia, irregular rhythm).
 
 Verified against real ECG recordings from the MIT-BIH Arrhythmia Database.
 
-Pipeline
+## Pipeline
 
 ecg_rom -> lpf -> hpf -> derivative -> squaring -> mwi -> peak_detect
          -> heart_rate -> arrhythmia_classify
 
-StagePurposeecg_romSample source (ROM-based stand-in for a live ADC feed)lpfLow-pass filter — removes high-frequency noisehpfHigh-pass filter — removes baseline wander / DC offsetderivativeAmplifies steep slopes characteristic of the QRS complexsquaringNonlinear amplification, emphasizes true QRS energymwiMoving window integrator — smooths into a QRS-width energy pulsepeak_detectAdaptive-threshold R-peak detection with refractory lockoutheart_rateConverts peak-to-peak timing into BPMarrhythmia_classifyRule-based rhythm classification (NORMAL / BRADYCARDIA / TACHYCARDIA / IRREGULAR)
+| Stage | Purpose |
+| --- | --- |
+| ecg_rom | Sample source (ROM-based stand-in for a live ADC feed) |
+| lpf | Low-pass filter: removes high-frequency noise |
+| hpf | High-pass filter: removes baseline wander / DC offset |
+| derivative | Amplifies steep slopes characteristic of the QRS complex |
+| squaring | Nonlinear amplification, emphasizes true QRS energy |
+| mwi | Moving window integrator: smooths into a QRS-width energy pulse |
+| peak_detect |Adaptive-threshold R-peak detection with refractory lockout |
+| heart_rate | Converts peak-to-peak timing into BPM |
+| arrhythmia_classify | Rule-based rhythm classification (NORMAL / BRADYCARDIA / TACHYCARDIA / IRREGULAR) |
 
 Full block diagram and design rationale: see docs/ (or inline module
 comments — each module's header explains what it computes and why).
 
-Repo structure
+## Repo structure
 
-rtl/                  design sources (ecg_rom.v, lpf.v, hpf.v, ...)
-tb/                   per-module self-checking testbenches + tb_ecg_top.v
-sim/                  ecg.mem test vectors, MATLAB scripts that generate them
-docs/                 block diagrams, design notes
+ecg-fpga/
+├── README.md
+├── rtl/
+│   ├── ecg_rom.v
+│   ├── lpf.v
+│   ├── hpf.v
+│   ├── derivative.v
+│   ├── squaring.v
+│   ├── mwi.v
+│   ├── peak_detect.v
+│   ├── heart_rate.v
+│   ├── arrhythmia_classify.v
+│   └── ecg_top.v
+├── tb/
+│   ├── tb_lpf.v
+│   ├── tb_hpf.v
+│   ├── ... (one per module)
+│   └── tb_ecg_top.v
+├── sim/
+|   ├── generate_ecg_mem.m
+|   └── ecg.mem
+└── docs/                 block diagrams, design notes
+|   ├── FILL IN
+|   └── FILL IN 
 
-(Adjust to match your actual Vivado project layout — the important part is
-separating design sources from testbenches from test data.)
+## Verification approach
 
-Verification approach
-
-Every module has an independent, self-checking testbench — no manual
+Every module has an independent, self-checking testbench, no manual
 waveform inspection required. Each testbench builds its own reference
 model (not copy-pasted from the DUT) and asserts a PASS/FAIL with a
 mismatch count.
 
-
-Unit level: lpf, hpf, derivative, squaring, mwi,
-peak_detect, heart_rate, arrhythmia_classify — each verified in
-isolation against directed test cases, impulse/step responses where
-applicable, and randomized regression.
-Integration level: tb_ecg_top.v runs the full chain against real
-MIT-BIH data (ecg.mem) and checks end-to-end behavior — R-peak
-spacing tracks the real signal (not a fixed cadence), reported HR falls
-in a physiologically plausible range, and rhythm classification
+* Unit level: lpf, hpf, derivative, squaring, mwi, peak_detect, heart_rate, arrhythmia_classify — each verified in
+isolation against directed test cases, impulse/step responses where applicable, and randomized regression.
+* Integration level: tb_ecg_top.v runs the full chain against real MIT-BIH data (ecg.mem) and checks end-to-end behavior.
+R-peak spacing tracks the real signal, reported HR falls in a physiologically plausible range, and rhythm classification
 produces real output.
 
-
+## CAN PUT IN DOCS 
 A real finding worth knowing about
 
 Two of the filter stages (lpf, hpf) were originally implemented as
@@ -82,23 +104,18 @@ MATLAB → MIT-BIH → 200Hz resampling pipeline). Note: clk_freq is
 overridden to a small value in the testbench purely for simulation
 speed; use the real target frequency (default 100MHz) for synthesis.
 
-Known limitations / possible extensions
+## Known limitations / possible extensions
+
+* Single-lead only.
+* peak_detect requires a quiet ~1.3s warm-up window to calibrate its adaptive threshold before trusting detections.
+* Arrhythmia classification is simple threshold/rule-based, not validated against clinical sensitivity/precision metrics
+(a companion MATLAB reference implementation computes those against PhysioNet annotations — see sim/).
+* No explicit lead-off / motion-artifact detection.
 
 
-Single-lead only.
-peak_detect requires a quiet ~1.3s warm-up window to calibrate its
-adaptive threshold before trusting detections.
-Arrhythmia classification is simple threshold/rule-based, not
-validated against clinical sensitivity/precision metrics (a companion
-MATLAB reference implementation computes those against PhysioNet
-annotations — see sim/).
-No explicit lead-off / motion-artifact detection.
-
-
-Background
+## Background
 
 Based on: Pan J, Tompkins WJ. A Real-Time QRS Detection Algorithm.
 IEEE Trans Biomed Eng. 1985.
 
 Test data: MIT-BIH Arrhythmia Database (PhysioNet).
-Contentecg.memmemecg.memmemexcerpt_from_previous_claude_message.txt1 linetxtexcerpt_from_previous_claude_message.txt1 linetxtexcerpt_from_previous_claude_message.txt1 linetxtexcerpt_from_previous_claude_message.txt1 linetxtexcerpt_from_previous_claude_message.txt1 linetxt
