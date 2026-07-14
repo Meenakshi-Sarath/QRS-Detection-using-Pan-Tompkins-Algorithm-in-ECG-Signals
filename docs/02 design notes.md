@@ -45,7 +45,7 @@ Every stage grows its output width relative to its input, to avoid overflow from
 | hpf | data_width+8 (24 bits) | Small additional headroom over lpf's output | 
 | derivative | data_width+8 (24 bits) | Same order of magnitude as hpf | 
 | squaring | 2*data_width+16 (48 bits) |  Squaring roughly doubles the bit count needed |
-| mwi  2*data_width+16 (48 bits), internal sum uses +5 more bits | Summing 32 (2⁵) terms needs 5 extra headroom bits |
+| mwi | 2*data_width+16 (48 bits), internal sum uses +5 more bits | Summing 32 (2⁵) terms needs 5 extra headroom bits |
 
 Why this matters if asked: undersizing any of these would cause silent overflow/wraparound — exactly the class of bug found
 in this project's lpf/hpf (see 03-bugs-and-fixes.md), though that particular case turned out to be a numerical-stability 
