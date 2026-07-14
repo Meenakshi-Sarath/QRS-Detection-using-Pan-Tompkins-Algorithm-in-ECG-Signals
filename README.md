@@ -24,6 +24,8 @@ Verified against real ECG recordings from the MIT-BIH Arrhythmia Database.
 Full block diagram and design rationale: see docs/ (or inline module
 comments — each module's header explains what it computes and why).
 
+<img width="700" height="380" alt="image" src="https://github.com/user-attachments/assets/d1509fef-b27a-4ade-bd7c-405dc3101f37" />
+
 ## Repo structure
 
 ecg-fpga/ <br>
