@@ -9,79 +9,6 @@ Verified against real ECG recordings from the MIT-BIH Arrhythmia Database.
 
 ## Pipeline
 
-<svg width="700" height="380" viewBox="0 0 700 380" xmlns="http://www.w3.org/2000/svg" role="img">
-<title>ECG signal processing pipeline flowchart</title>
-<desc>Snake-pattern flowchart: ECG signal, low-pass filter, high-pass filter, derivative, squaring, moving window integrator, peak detection, heart rate, arrhythmia classification</desc>
-<defs>
-<marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-<path d="M2 1L8 5L2 9" fill="none" stroke="#5F5E5A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-</marker>
-</defs>
-
-<rect width="700" height="380" fill="#FFFFFF"/>
-
-<!-- Row 1 -->
-<g>
-<rect x="40" y="40" width="180" height="60" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="1"/>
-<text x="130" y="70" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#0C447C">ECG signal</text>
-</g>
-<g>
-<rect x="260" y="40" width="180" height="60" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="1"/>
-<text x="350" y="70" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#0C447C">Low-pass filter</text>
-</g>
-<g>
-<rect x="480" y="40" width="180" height="60" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="1"/>
-<text x="570" y="70" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#0C447C">High-pass filter</text>
-</g>
-
-<!-- Row 2 (reversed) -->
-<g>
-<rect x="480" y="160" width="180" height="60" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="1"/>
-<text x="570" y="190" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#0C447C">Derivative</text>
-</g>
-<g>
-<rect x="260" y="160" width="180" height="60" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="1"/>
-<text x="350" y="190" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#0C447C">Squaring</text>
-</g>
-<g>
-<rect x="40" y="160" width="180" height="60" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="1"/>
-<text x="130" y="190" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#0C447C">Moving window integrator</text>
-</g>
-
-<!-- Row 3 -->
-<g>
-<rect x="40" y="280" width="180" height="60" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="1"/>
-<text x="130" y="310" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#0C447C">Peak detection</text>
-</g>
-<g>
-<rect x="260" y="280" width="180" height="60" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="1"/>
-<text x="350" y="310" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#085041">Heart rate</text>
-</g>
-<g>
-<rect x="480" y="280" width="180" height="60" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="1"/>
-<text x="570" y="310" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#085041">Arrhythmia classify</text>
-</g>
-
-<!-- Row 1 arrows (left to right) -->
-<line x1="220" y1="70" x2="256" y2="70" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
-<line x1="440" y1="70" x2="476" y2="70" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
-
-<!-- Row1 -> Row2 (down, right column) -->
-<line x1="570" y1="100" x2="570" y2="156" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
-
-<!-- Row 2 arrows (right to left) -->
-<line x1="480" y1="190" x2="444" y2="190" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
-<line x1="260" y1="190" x2="224" y2="190" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
-
-<!-- Row2 -> Row3 (down, left column) -->
-<line x1="130" y1="220" x2="130" y2="276" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
-
-<!-- Row 3 arrows (left to right) -->
-<line x1="220" y1="310" x2="256" y2="310" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
-<line x1="440" y1="310" x2="476" y2="310" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
-
-</svg>
-
 | Stage | Purpose |
 | --- | --- |
 | ecg_rom | Sample source (ROM-based stand-in for a live ADC feed) |
@@ -99,30 +26,31 @@ comments — each module's header explains what it computes and why).
 
 ## Repo structure
 
-ecg-fpga/
-├── README.md
-├── rtl/
-│   ├── ecg_rom.v
-│   ├── lpf.v
-│   ├── hpf.v
-│   ├── derivative.v
-│   ├── squaring.v
-│   ├── mwi.v
-│   ├── peak_detect.v
-│   ├── heart_rate.v
-│   ├── arrhythmia_classify.v
-│   └── ecg_top.v
-├── tb/
-│   ├── tb_lpf.v
-│   ├── tb_hpf.v
+ecg-fpga/ <br>
+├── README.md <br>
+├── rtl/ <br>
+│   ├── ecg_rom.v <br>
+│   ├── lpf.v <br>
+│   ├── hpf.v <br>
+│   ├── derivative.v <br>
+│   ├── squaring.v <br>
+│   ├── mwi.v <br>
+│   ├── peak_detect.v <br>
+│   ├── heart_rate.v <br>
+│   ├── arrhythmia_classify.v <br>
+│   └── ecg_top.v <br>
+├── tb/ <br>
+│   ├── tb_lpf.v <br>
+│   ├── tb_hpf.v <br>
 │   ├── ... (one per module)
-│   └── tb_ecg_top.v
-├── sim/
-|   ├── generate_ecg_mem.m
-|   └── ecg.mem
-└── docs/                 block diagrams, design notes
-|   ├── FILL IN
-|   └── FILL IN 
+│   └── tb_ecg_top.v <br>
+├── sim/ <br>
+|   ├── generate_ecg_mem.m <br>
+|   └── ecg.mem <br>
+└── docs/                 block diagrams, design notes <br>
+|   ├── FILL IN <br>
+|   └── FILL IN  <br>
+└──
 
 ## Verification approach
 
