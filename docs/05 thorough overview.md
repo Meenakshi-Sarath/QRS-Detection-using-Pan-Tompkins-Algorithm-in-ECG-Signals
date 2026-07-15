@@ -89,3 +89,66 @@ Trying to hand-write that bit-unpacking logic yourself (in MATLAB, Python, or an
 
 ----------
 WFDB is the translator between "an obscure packed binary format from decades-old medical equipment" and "a clean floating-point array MATLAB can actually work with." rdsamp is the specific function that does the translation — unpack the bytes, look up the gain/baseline from the header, apply the conversion formula, return real millivolts.
+
+# LPF 
+
+## RTL 
+Cascaded double moving sum method (FIR not IIR)
+* output reg [data_width+5:0] lpf_out: size is increased by 6 bits from 16 to 22
+* It is a 2 stage structure
+  - x_delay[0:5] — a 6-slot shift register holding the 6 most recent raw input samples. This is stage 1's "window."
+  - stage1_sum — the running sum of those 6 samples (a simple 6-sample moving average, un-divided — it's a sum, not an average, since we're not dividing by 6 anywhere).
+  - s1_delay[0:5] — a second 6-slot shift register, but this one holds the 6 most recent stage-1 sums (not raw samples) — this is stage 2's window.
+  - stage2_sum — the running sum of those 6 stage-1 sums. This final value is lpf_out
+
+ #### Why +3 bits of headroom at each stage:
+ summing 6 terms can produce a result up to 6× larger than any single term. $clog2(6) = 3 (since 2³=8 ≥ 6), so 3 extra bits safely covers a 6-term sum without overflow, applied twice (once per stage), hence +3 for stage1_sum, another +3 on top of that for stage2_sum, totaling +6
+
+ #### To reduce the number of computations (additions) we are doing in summing the elements:
+ * we use the add-new, drop-oldest, running sum technique.
+ * it maintains a running total and just updates it incrementally: subtract whatever's about to fall out of the 6-sample window (x_delay[5], the oldest sample currently held) and add the brand-new sample (ecg_in) coming in.
+ * Same add-new/drop-oldest pattern, one level up — but notice the expression (stage1_sum - x_delay[5] + ecg_in) appears three separate times here. That's deliberate, not accidental repetition: it's this cycle's freshly-updated stage-1 sum, recomputed explicitly each time it's needed, rather than trying to read stage1_sum itself (which, due to non-blocking assignment, would still hold last cycle's stale value at this point in the same always block). This is the exact same "recompute rather than trust the lagging register" technique you correctly identified in your own mwi module's comment
+
+## Testbench 
+
+* The actual test sequence: reset, then three phases — a single impulse (apply(1000) followed by 20 zeros, to observe the filter's impulse response settle out), a step input (20 samples of a constant 500, to check steady-state behavior), then 500 fully random samples for broad regression coverage.
+
+* The checker runs as a separate, concurrently-executing always block — triggered on negedge clk (the falling edge) specifically so it checks values after they've fully settled from the posedge update, avoiding any race condition where you'd be comparing a value against itself mid-update. 
+
+#### Why sliding one boxcar across another gives a triangle
+A boxcar function is just a flat-topped rectangle — constant height for some stretch, zero everywhere else.
+Picture two identical rectangular blocks, each 6 units wide. Slide one across the other, and at every position, measure how much they overlap.
+
+When they're far apart, overlap = 0.
+As one starts sliding into the other, the overlap grows a little at a time — 1 unit, then 2, then 3...
+When they're perfectly aligned, overlap is maximal — the full 6 units.
+Then as it keeps sliding past, the overlap shrinks back down the same way it grew — 5, 4, 3, 2, 1, 0.
+
+Plot "amount of overlap" against "how far you've slid" and you get exactly a triangle — rising linearly, peaking in the middle, falling linearly. That's not a coincidence or a special property of this particular filter — it's a completely general geometric fact: the convolution of a rectangle with itself is always a triangle, regardless of what the rectangle represents.
+
+#### Why a boxcar average acts as a low-pass filter, conceptually
+Think about what averaging does to a fast-wiggling signal versus a slowly-changing one, over any given 6-sample window:
+
+A high-frequency signal swings up and down rapidly — within a short 6-sample window, it likely has samples with large variations. Averaging them together, those swings largely cancel out, leaving something small/ mean. High frequencies get suppressed and might cause a DC offset. This can then be removed using hpf.
+
+A low-frequency (slowly varying) signal barely changes at all across 6 samples — they're all pointing roughly the same direction. Averaging them barely changes anything — the value passes through close to unaffected.
+
+### Where the cutoff frequency actually comes from
+
+#### Frequency response:
+* Imagine an experiment: feed a pure, single-frequency tone into your filter, measure how big the output wave is compared to the input.
+* For each frequency, you get one number: what fraction of the input amplitude survived. That collection of numbers, plotted against frequency, is the frequency response.
+  
+* With N=6 and F_s=200Hz (this project's sample rate): f_null = 200/6 ≈ 33Hz. Beyond that point, the filter isn't cleanly rejecting anymore — sinc functions have ripply sidelobes past the first null — but everything meaningfully above roughly that frequency is heavily attenuated.
+
+* A boxcar's frequency response doesn't switch off suddenly — it tapers down gradually, hits zero once (the null), then ripples back up a bit, tapers again, and so on. "Cutoff frequency" conventionally means something much gentler than "total rejection": it's the -3dB point, where the signal's power has dropped to half its original value — equivalently, where the amplitude has dropped to 1/√2 ≈ 0.707 of its original size. That's a much less strict condition than "completely zeroed out" (the null). So naturally, the -3dB point occurs at a lower frequency than the null — the signal is already noticeably weakened well before it's fully rejected.
+
+* For our LPF, that ~11Hz number tells you: "below this, the QRS energy mostly survives; above this, it's being suppressed.
+
+  <img width="157" height="44" alt="image" src="https://github.com/user-attachments/assets/49bd9f48-1564-4e46-978a-61f5b65f1878" />
+ Plug in the specific case "output power is exactly half the input power
+<img width="280" height="27" alt="image" src="https://github.com/user-attachments/assets/9bfd7bb7-bbd8-4542-87f6-cb9202f1db70" />
+
+<img width="485" height="219" alt="image" src="https://github.com/user-attachments/assets/e75ad489-32e5-4b43-b9a6-dae9246da621" />
+A single boxcar needs to attenuate down to 70.7% amplitude to hit its own -3dB point (~14.8Hz); but because this filter uses two boxcars in series, each one only needs to attenuate down to 84.1% amplitude to reach the combined system's -3dB point, and since less attenuation always happens at a lower frequency for a low-pass filter, that combined -3dB point ends up lower (~11Hz) than either single stage's own cutoff would be.
+
