@@ -153,3 +153,23 @@ A low-frequency (slowly varying) signal barely changes at all across 6 samples �
 
 A single boxcar needs to attenuate down to 70.7% amplitude to hit its own -3dB point (~14.8Hz); but because this filter uses two boxcars in series, each one only needs to attenuate down to 84.1% amplitude to reach the combined system's -3dB point, and since less attenuation always happens at a lower frequency for a low-pass filter, that combined -3dB point ends up lower (~11Hz) than either single stage's own cutoff would be.
 
+f_-3dB ≈ 0.443 × Fs/N = 0.443 × 33.3 ≈ 14.8 Hz <br>
+- 0.443 is a standard published constant for boxcar filters (Lyon's DSP value for -3db cutoff freq)
+- Two identical stages in series means the total response is H(f)². Squaring a response that's already 1/√2 at 14.8 Hz gives 0.5 there — i.e. -6dB, not -3dB. So the true -3dB point of the cascade has to occur earlier (lower frequency), because you're already down 6dB by the time you reach 14.8 Hz. Solving H(f)² = 1/√2 numerically instead of H(f) = 1/√2 moves the crossing down to about 11 Hz.
+
+
+Cascading identical filter stages always sharpens the rolloff — because you're multiplying magnitude responses. So the -3dB bandwidth always shrinks when you cascade, and 33→14.8→11 Hz is really three different definitions on the same underlying curve: zero-crossing, single-stage half-power point, and two-stage half-power point.
+
+### How my intially realised IIR implementation of lpf is converted to my 11 tap FIR filter
+
+H(z) = Y(z)/X(z) = (1 - 2z⁻⁶ + z⁻¹²) / (1 - 2z⁻¹ + z⁻²) <br>
+H(z) = [(1 - z⁻⁶) / (1 - z⁻¹)]²
+
+(1 - z⁻⁶)/(1 - z⁻¹) = 1 + z⁻¹ + z⁻² + z⁻³ + z⁻⁴ + z⁻⁵ = Σ_{k=0}^{5} z⁻ᵏ <br>
+This is exactly a 6 sample boxcar (moving-sum) filter
+
+#### Why the recursive form blows up
+
+* The denominator (1-z⁻¹)² puts a double pole exactly at z = 1, on the unit circle. The numerator (1-z⁻⁶)² happens to have a double zero at z = 1 too (since z=1 is one of the 6th roots of unity), so algebraically they cancel and the true system is FIR (finite, bounded impulse response).
+* But in a recursive hardware realization, you're literally instantiating that double pole via feedback (2y[n-1] - y[n-2]). The cancellation with the feedforward zero only happens if the arithmetic is exact. A double pole sitting on the unit circle is marginally unstable — its natural response is a ramp (grows like n, not just a constant), and any tiny truncation/rounding error that isn't perfectly cancelled by the corresponding numerator zero gets integrated by that pole indefinitely.
+* In fixed-point (22-bit) arithmetic there's always some residual, so the ramp/growth term never gets cancelled and accumulates — consistent with what you saw diverging within the first ~20–30 samples and then wrapping once it overflows the declared word width.
