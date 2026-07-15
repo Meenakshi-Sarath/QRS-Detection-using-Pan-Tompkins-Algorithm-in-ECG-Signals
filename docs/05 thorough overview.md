@@ -30,6 +30,15 @@ statistically meaningful pattern rather than a lucky single data point.
 ## Testbench 
 
 The clock generated hausing always #5 clk =~clk, has a 10ns periods = 100MHz frequency.
+<img width="221" height="137" alt="image" src="https://github.com/user-attachments/assets/8c4be45b-8d29-447c-8976-dde4fe412983" />
+
+#### Why the original signal isn't centered at zero in the first place
+
+Real ECG recordings commonly have a DC bias — the electrode-skin interface itself introduces an offset voltage that isn't part of the actual cardiac signal, plus slow baseline wander from breathing, electrode movement, or skin impedance changes. This is a completely normal, well-known characteristic of raw ECG recordings — it's not something wrong with the MIT-BIH data or your script, it's just what real, unprocessed biosignal data looks like before any conditioning.
+We actually already found and measured this earlier for one of your ecg.mem files — the mean was around −10,832 (roughly a third of the full 16-bit range), consistently negative rather than centered at 0. What you're seeing on screen now (−3820, −5264, −4730...) is that same phenomenon — different specific values since this looks like a different run/record, but same underlying cause.
+
+#### Is this a problem for the design?
+No — and here's the important part: this is exactly what hpf exists to remove. A high-pass filter's whole job is stripping out DC offset and slow baseline wander, keeping only the higher-frequency content where QRS energy lives. So a raw, offset-biased ecg_sample at this very first stage of the pipeline is normal and expected — by the time the signal reaches hpf's output, that consistent negative bias should be gone (we confirmed this back when validating the fixed hpf on real data — its output oscillated around zero, unlike the raw input, unlike lpf's output which still carries the amplified DC offset through since lpf doesn't remove DC, only hpf does).
 
 ## How the ecg_mem file was generated
 
