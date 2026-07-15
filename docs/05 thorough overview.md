@@ -150,5 +150,6 @@ A low-frequency (slowly varying) signal barely changes at all across 6 samples â
 <img width="280" height="27" alt="image" src="https://github.com/user-attachments/assets/9bfd7bb7-bbd8-4542-87f6-cb9202f1db70" />
 
 <img width="485" height="219" alt="image" src="https://github.com/user-attachments/assets/e75ad489-32e5-4b43-b9a6-dae9246da621" />
+
 A single boxcar needs to attenuate down to 70.7% amplitude to hit its own -3dB point (~14.8Hz); but because this filter uses two boxcars in series, each one only needs to attenuate down to 84.1% amplitude to reach the combined system's -3dB point, and since less attenuation always happens at a lower frequency for a low-pass filter, that combined -3dB point ends up lower (~11Hz) than either single stage's own cutoff would be.
 
