@@ -229,3 +229,22 @@ I built a MATLAB reference model of the whole Pan-Tompkins pipeline and ran it a
 * MATLAB's filter() uses double-precision floating point, which is still finite-precision — not truly infinite — but its rounding error per operation is on the order of 10^-16, versus the RTL's >>>5 truncation which discards on the order of 3% of the value every cycle.
 * That's about 14 orders of magnitude difference, so over a few thousand ECG samples, the double-precision version's accumulated error stays completely negligible while the RTL's becomes visible within ~1500 samples.
 * So MATLAB isn't 'immune' to the underlying instability — it's just far, far slower to reveal it, because the same undamped-pole mechanism is technically present in both
+
+# DERIVATIVE 
+
+## RTL 
+
+* Input and output are the same width (data_width+7:0, 24 bits) — unlike lpf/hpf, this stage doesn't need extra headroom for gain, because a derivative (difference between nearby samples) is typically smaller in magnitude than the samples themselves, not larger.
+*  A 5-point numerical derivative estimate, weighted so it emphasizes the near samples.This is a smoothed slope estimate, not a raw single-step difference.
+
+## Testbench 
+
+* The apply() task is for driving one sample at a time.
+* TASKS: we can include delays in the body of the task, it can return multiple values and is useful for code reusability.
+* In our testbench, we check for an impulse input and randomised input.
+* - This is the directed impulse-response test, feed a single impulse (800), then zeros, and hand-verify the exact expected output at each step by walking through the formula manually. Here we are genuinely working through what the module should produce, using an 'expected' variable that stores the expected value, not just re-running the DUT's own logic.
+  - A second, independent reference model, running concurrently — its own delay line (rx[]), its own output register (ref_out), written completely separately from the DUT. This exists specifically to cover the randomized portion of the test, since hand-computing expected values for 300 random inputs one at a time isn't practical the way it was for the small directed impulse test above.
+
+
+----------------
+Unit-level self-checking testbenches are necessary but not sufficient — they're cheap to build and reliably catch implementation bugs (typos, indexing, timing), but by construction they can't catch a flawed specification, since a flawed spec implemented twice independently just agrees with itself. That's exactly why this project also needed integration testing against real data — that's the layer that actually found the real bugs, not the unit tests.
