@@ -173,3 +173,42 @@ This is exactly a 6 sample boxcar (moving-sum) filter
 * The denominator (1-z⁻¹)² puts a double pole exactly at z = 1, on the unit circle. The numerator (1-z⁻⁶)² happens to have a double zero at z = 1 too (since z=1 is one of the 6th roots of unity), so algebraically they cancel and the true system is FIR (finite, bounded impulse response).
 * But in a recursive hardware realization, you're literally instantiating that double pole via feedback (2y[n-1] - y[n-2]). The cancellation with the feedforward zero only happens if the arithmetic is exact. A double pole sitting on the unit circle is marginally unstable — its natural response is a ramp (grows like n, not just a constant), and any tiny truncation/rounding error that isn't perfectly cancelled by the corresponding numerator zero gets integrated by that pole indefinitely.
 * In fixed-point (22-bit) arithmetic there's always some residual, so the ramp/growth term never gets cancelled and accumulates — consistent with what you saw diverging within the first ~20–30 samples and then wrapping once it overflows the declared word width.
+
+# HPF 
+
+## RTL 
+
+### Verifying the algebra: recursive form → exact FIR equivalent
+y[n] - y[n-1] = -x[n]/32 + x[n-16] - x[n-17] + x[n-32]/32
+
+Y(z)(1 - z⁻¹) = X(z)[ -1/32 + z⁻¹⁶ - z⁻¹⁷ + z⁻³²/32 ] <br>
+Group the RHS into two pieces that both have (1-z⁻¹) as a factor:
+Y(z)(1 - z⁻¹) = X(z)[ -1/32 + z⁻¹⁶ - z⁻¹⁷ + z⁻³²/32 ]
+              = -(1/32)(1-z⁻¹) · S(z),   where S(z) = Σ_{k=0}^{31} z⁻ᵏ
+
+Also z⁻¹⁶ - z⁻¹⁷ = z⁻¹⁶(1 - z⁻¹)
+
+Y(z)(1-z⁻¹) = X(z)(1-z⁻¹)[ z⁻¹⁶ - (1/32)S(z) ] <br>
+Y(z) = X(z)[ z⁻¹⁶ - (1/32)S(z) ]
+
+Back to the time domain <br>
+y[n] = x[n-16] - (1/32) · Σ_{k=0}^{31} x[n-k]
+
+That's a textbook DC-blocking / high-pass structure: a moving average is a lowpass, so (delayed original) − (lowpass) = highpass.
+
+The instability mechanism is the same story as your LPF: the recursion has a unity-gain pole at z=1 (1-z⁻¹ in the denominator), and it's only cancelled by a matching zero algebraically. In fixed-point RTL with truncating >>>5, the cancellation is never bit-exact, so that undamped pole integrates the leftover rounding error every cycle — which is exactly what produced the ~-86,000,000 drift in simulation.
+
+So running_sum - x_delay[31] + lpf_in
+
+#### Bit widths/ headroom 
+
+- lpf_in, x_delay[]: 22 bits (data_width+5:0)
+- running_sum: 27 bits — enough for 32 × 22-bit values
+- hpf_out: 24 bits (data_width+7:0) — center tap (22 bits) minus a shifted-down average (~22 bits), needs at most ~23 bits worst case, so 24 bits gives comfortable margin.
+
+No feedback accumulator anywhere — running_sum only ever depends on the last 32 bounded samples via add-newest/drop-oldest, so it's unconditionally bounded regardless of how many cycles run.
+
+## Testbench
+
+This testbench proves the RTL faithfully implements the intended equation — it's a great regression/implementation check. But since both DUT and reference use the same fixed-point formula (>>>5 truncation and all), it can't by itself catch a bug in the derivation
+
