@@ -8,7 +8,7 @@ depends on the external crystal oscillator (PLL) which is soldered on the PCB ne
 in clock. 
 We can find the value in the board's datasheet.  <br>
 We are basically creating a 200Hz virtual clock. Should keep in mind that MIT-BIH recordings are sampled at 360Hz, but we are 
-resampling it to 200Hz, so that we can verify our results with the paper I a referring
+resampling it to 200Hz, so that we can verify our results with the paper I am referring
 
 ### Rom declaration
 
