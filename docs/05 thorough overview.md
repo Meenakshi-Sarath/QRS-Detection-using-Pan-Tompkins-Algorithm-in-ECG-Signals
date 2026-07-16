@@ -212,3 +212,20 @@ No feedback accumulator anywhere — running_sum only ever depends on the last 3
 
 This testbench proves the RTL faithfully implements the intended equation — it's a great regression/implementation check. But since both DUT and reference use the same fixed-point formula (>>>5 truncation and all), it can't by itself catch a bug in the derivation
 
+#### Matlab vs RTL implementation
+I built a MATLAB reference model of the whole Pan-Tompkins pipeline and ran it against MIT-BIH records to validate the algorithm itself — Sensitivity/Precision against the annotated R-peaks. That gave me confidence the equations were right. I didn't go as far as modeling the exact fixed-point truncation behavior in MATLAB — for that I relied more on reasoning through the pole-zero cancellation analytically, and cross-checking a wide-accumulator ('shadow') version of the recursion in simulation to see the drift directly.
+
+* The recursive (IIR) LPF and HPF forms are algebraically equivalent to bounded FIR filters, but only because a feedback pole exactly cancels a feedforward zero at z=1 — the unit circle.
+* That cancellation only holds in infinite-precision arithmetic.
+* In fixed-point RTL, the truncating right-shifts (dividing by 32, etc.) introduce a small rounding error every cycle, and because the pole sits exactly on the unit circle with unity gain, that residual error isn't damped (becausepole's natural response isn't bounded oscillation, it's a ramp that grows over time), it gets integrated by the feedback loop indefinitely
+* So the true value grows without bound the longer you run it, regardless of how wide you make the registers.
+* I confirmed this wasn't just a headroom issue by running a wide 'shadow' version of the same recursion in parallel in simulation — with no truncation, so it can't itself overflow — and watched the true, unclipped value drift into the tens of millions within a couple thousand samples on real ECG data.
+* Since no register width can survive unbounded growth if you run long enough, the actual fix is to remove the feedback path entirely and realize the exact same transfer function as a direct FIR — a cascaded/windowed moving-sum structure with no accumulator — which is unconditionally stable for any bounded input
+
+#### Matlab has infinite precision? No no 
+
+* Both are finite precision, but MATLAB's error accumulates ~10^14 times slower, so it never becomes visible at ECG-length timescales, while the RTL's error becomes visible within ~1500 samples.
+* A MATLAB double is IEEE 754 double-precision floating point: 64 bits total, giving you about 15-16 significant decimal digits of precision.
+* MATLAB's filter() uses double-precision floating point, which is still finite-precision — not truly infinite — but its rounding error per operation is on the order of 10^-16, versus the RTL's >>>5 truncation which discards on the order of 3% of the value every cycle.
+* That's about 14 orders of magnitude difference, so over a few thousand ECG samples, the double-precision version's accumulated error stays completely negligible while the RTL's becomes visible within ~1500 samples.
+* So MATLAB isn't 'immune' to the underlying instability — it's just far, far slower to reveal it, because the same undamped-pole mechanism is technically present in both
