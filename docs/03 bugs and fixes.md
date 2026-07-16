@@ -136,3 +136,9 @@ capacity (truncating first would capture a different, shorter real-time window o
 every module downstream was internally consistent and individually correct — the bug was entirely in test-data provenance, 
 not the design. Sanity-checking your test vectors' origin matters as much as testing the RTL itself; a "boring" 
 data-generation script can silently invalidate an otherwise fully-correct design.
+
+## Bug 5: In derivative module 
+
+### Known limitation, not fixed by design choice: 
+* derivative.v's intermediate sum can overflow its 24-bit width for hpf_in magnitudes above ~4.19M (roughly half its ±8.39M range), since the formula's ×2 coefficients push the pre-shift sum up to 6× a single sample's value with zero extra headroom allocated.
+* In practice this is dormant — real ECG data through the fixed hpf stayed well within a few million, nowhere near this boundary — so it was deliberately left unaddressed given time constraints, documented rather than silently ignored, and flagged as a known edge case that would only matter with corrupted/malformed input or a future data_width change without re-verifying headroom across the pipeline.
