@@ -170,6 +170,11 @@ This is exactly a 6 sample boxcar (moving-sum) filter
 
 #### Why the recursive form blows up
 
+The transfer function has a repeated pole and a repeated zero at z=1, and in exact arithmetic they cancel exactly, which is why the ideal system is a stable, bounded FIR filter. The problem is that this cancellation only holds in infinite-precision math. In fixed-point RTL, the truncating shifts introduce a small rounding error every cycle that isn't captured by that exact cancellation anymore. Because the pole sits exactly on the unit circle — not inside it — its natural response to any residual error is a ramp, not a decaying transient: a pole inside the unit circle would let that error die out over time, but a pole on the circle has unity gain, so the error just keeps accumulating, unbounded, forever. That growing value eventually exceeds the register's fixed width and wraps around.
+
+
+* Poles at z=1 are only safe because of an exact matching zero, and that exact match is what breaks under truncation.
+* The instability isn't from "having poles at z=1" per se (if they perfectly cancelled always, there'd be no problem) — it's that the cancellation itself isn't achievable in fixed-point arithmetic
 * The denominator (1-z⁻¹)² puts a double pole exactly at z = 1, on the unit circle. The numerator (1-z⁻⁶)² happens to have a double zero at z = 1 too (since z=1 is one of the 6th roots of unity), so algebraically they cancel and the true system is FIR (finite, bounded impulse response).
 * But in a recursive hardware realization, you're literally instantiating that double pole via feedback (2y[n-1] - y[n-2]). The cancellation with the feedforward zero only happens if the arithmetic is exact. A double pole sitting on the unit circle is marginally unstable — its natural response is a ramp (grows like n, not just a constant), and any tiny truncation/rounding error that isn't perfectly cancelled by the corresponding numerator zero gets integrated by that pole indefinitely.
 * In fixed-point (22-bit) arithmetic there's always some residual, so the ramp/growth term never gets cancelled and accumulates — consistent with what you saw diverging within the first ~20–30 samples and then wrapping once it overflows the declared word width.
@@ -260,3 +265,29 @@ der_in matches der_out's width from the derivative module — 24 bits, signed. s
 * test_vals is an array of 7 pre-chosen directed inputs (declared upfront rather than inline, since there are several deliberately curated corner cases to run through in sequence)
 * The test_vals has directed corner cases when der_in 0, +-1, +- the boundary of the 24 bit input, and 2 arbitary values.
 * After that go for 200 randomised values and see if the sqaured expected value matches the sq_out we get from our rtl module.
+
+# MOVING WINDOW INTEGRATION 
+
+- Coming out of squaring, the signal is a sequence of large, sharp, narrow spikes — one per genuine slope event, but very brief (just a few samples wide)
+- mwi fixes this by smearing energy over a window — instead of asking "is this exact sample big," it asks "how much energy has accumulated over the last 32 samples"
+- A brief spike gets spread into a wider, smoother "hump" whose width roughly matches a real QRS complex's actual duration (at 200Hz, 32 samples = 160ms — right in the range of a real QRS width).
+
+## RTL 
+
+* Both sq_in and mwi_out size is 48 bits [sq_width-1:0]
+* buffer is a 32-slot shift register holding the 32 most recent squared-derivative values — this is the literal "window."
+* sum is the running total of everything currently in that window, and this is the width-safety check worth doing explicitly: summing 32 values, each up to 48 bits, could need $clog2(32) = 5 extra bits of headroom to avoid overflow. (53 bits)
+* Same "add-new, drop-oldest" running-sum trick used.
+
+## Testbench 
+
+So we are essentially performing 3 checks:
+* Feed a constant value for longer than the window size, and the output must converge to exactly that constant, since averaging N copies of the same number gives that number back.
+* Same principle, second property: a moving average's impulse response is mathematically guaranteed to be a flat rectangular pulse — height impulse/N, lasting exactly N samples, then dropping to exactly zero the instant the impulse ages out of the window.
+* Next is a randomised regression of around 400 values, across the independent reference model that we implemented in the mwi testbench
+
+# PEAK DETECTION 
+
+## RTL 
+
+*The adaptive-threshold learning rule is self-referential, and starting all three state variables (SPKI, NPKI, TH1) at exactly 0 creates a degenerate feedback loop in the decision logic itself.
