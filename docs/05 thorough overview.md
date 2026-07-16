@@ -248,3 +248,15 @@ I built a MATLAB reference model of the whole Pan-Tompkins pipeline and ran it a
 
 ----------------
 Unit-level self-checking testbenches are necessary but not sufficient — they're cheap to build and reliably catch implementation bugs (typos, indexing, timing), but by construction they can't catch a flawed specification, since a flawed spec implemented twice independently just agrees with itself. That's exactly why this project also needed integration testing against real data — that's the layer that actually found the real bugs, not the unit tests.
+
+# SQUARING
+
+## RTL 
+
+der_in matches der_out's width from the derivative module — 24 bits, signed. sq_out is 2*data_width+15:0 — that's [47:0], 48 bits. the module's width was sized precisely to match squaring's actual worst case
+
+## Testbench 
+
+* test_vals is an array of 7 pre-chosen directed inputs (declared upfront rather than inline, since there are several deliberately curated corner cases to run through in sequence)
+* The test_vals has directed corner cases when der_in 0, +-1, +- the boundary of the 24 bit input, and 2 arbitary values.
+* After that go for 200 randomised values and see if the sqaured expected value matches the sq_out we get from our rtl module.
