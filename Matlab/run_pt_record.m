@@ -188,6 +188,5 @@ FP = sum(~matched);
 
 results.Sensitivity = TP/(TP+FN);
 results.Precision   = TP/(TP+FP);
-results.F1          = 2*(results.Precision*results.Sensitivity) / ...
-                       (results.Precision + results.Sensitivity);
+results.F1 = 2*results.Sensitivity*results.Precision / (results.Sensitivity + results.Precision);
 end
