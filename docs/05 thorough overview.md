@@ -290,4 +290,47 @@ So we are essentially performing 3 checks:
 
 ## RTL 
 
-*The adaptive-threshold learning rule is self-referential, and starting all three state variables (SPKI, NPKI, TH1) at exactly 0 creates a degenerate feedback loop in the decision logic itself.
+#### Adaptive Threshold learning 
+* The adaptive-threshold learning rule is self-referential, and starting all three state variables (SPKI, NPKI, TH1) at exactly 0 creates a degenerate feedback loop in the decision logic itself.
+* Because Th1 starts at 0, the very first sample where mwi_in > 0 (which is essentially the first real sample) satisfies mwi_in > TH1 so the signal level peak estimate gets updated but NPKI doesnt get updated (stays at 0).
+* data_width matches mwi_out width = 48.
+
+#### Refractory
+* Number of sample_tick cycles to lock out new detections after a peak fires. At 200 Hz, 60 samples = 300 ms. The comment explains this was originally 40 (200 ms, textbook value) but was widened after testing showed the tail-end of a single beat's MWI energy could still exceed threshold right as the shorter refractory period expired, causing a false double-detection on one physical heartbeat.
+
+* We have a ref_cnt counter which counts for a period of refractory samples so that any peak detected in this range can be considered invalid.
+* Another register counter counts till warmup samples are done for adaptive threshold learning after which a flag is turned high forever.
+
+
+## Testbench
+
+* First, drive WARMUP_SAMPLES (8) samples of a large value (90000), checking peak stays 0 every single time. This directly targets the fix: even though 90000 is a value that would trigger detection in normal mode, the calibration phase must ignore it entirely.
+* then when this 90000 was applied, we also check that while the peak detected is 0, the SPKI is updated successfully.
+* Apply a sample larger than the seeded SPKI (200000 > 90000) — since TH1 was seeded from data topping out at 90000, this new sample should clearly exceed threshold and fire peak.
+* Next is a refractory check
+
+### Overview of peak_detect because it might get a little confusing
+- Phase A (warm-up, WARMUP_SAMPLES ticks): make zero peak decisions; just observe. Track max_seen (running max) and sum_seen (running sum) of mwi_in.
+Seed at end of warm-up (mirrors real Pan-Tompkins learning-phase practice):
+
+NPKI = mean(window) → crude noise-floor estimate
+SPKI = max(window) → crude signal-amplitude estimate
+TH1 = NPKI + (SPKI − NPKI) >> 2 → same 25%-of-the-gap rule used in steady state
+
+
+- Phase B (steady state, unchanged Pan-Tompkins adaptive logic):
+
+If mwi_in > TH1: it's a peak → assert peak, enter refractory, update SPKI = (7·SPKI + mwi_in) / 8
+Else: treat as noise → update NPKI = (7·NPKI + mwi_in) / 8
+Recompute TH1 = NPKI + (SPKI − NPKI) >> 2 every cycle
+
+- Refractory logic
+
+REFRACTORY (300 ms / 60 samples @ 200 Hz) blocks new detections for a fixed window after a peak, to prevent one physiological beat's MWI tail from re-triggering a spurious second detection.
+Originally 200 ms (textbook value, 40 samples) — widened after integration testing showed double-detection on real ECG data.
+
+- Why this recursive form is safe (unlike LPF/HPF)
+
+The >>3 (÷8) exponential moving averages have coefficient 7/8, strictly inside the unit circle — not on it.
+Truncation error introduced each cycle decays away over time instead of integrating unboundedly, because the feedback gain is <1.
+Direct, useful contrast to draw against the LPF/HPF bug: same "recursive averaging" flavor, structurally totally different stability story.
