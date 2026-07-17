@@ -379,3 +379,24 @@ While reviewing this module I noticed the irregularity check reads rr_diff in th
 
 * pulse_and_capture task: drives hr/rr_interval/hr_valid=1 for one beat, waits one clock (the edge the DUT samples on), then captures rhythm_class/alarm immediately after (#1 delay to clear the NBA update region) — matching the module's "valid for one cycle only" behavior.
 * No independent reference model — correctness relies on hand-derived expected values, not a second, differently-implemented check.
+
+# ECG TOP MODULE 
+
+A second, independent initial block running concurrently with the main test — a watchdog timer. If the main test logic ever hangs (e.g., sample_tick never fires because of a misconfigured clk_freq/sample_rate ratio, and the wait statement blocks forever), this block guarantees the simulation still terminates with a diagnostic message instead of running indefinitely and looking like Vivado has simply frozen.
+
+I implemented the Pan-Tompkins QRS detection pipeline — nine stages taking raw ECG through filtering, feature extraction, and adaptive peak detection, down to heart rate and rhythm classification. Every module has an independent, self-checking unit testbench, and the full chain has an integration testbench that runs against real MIT-BIH data. Along the way, I found and fixed four real bugs — two numerical-stability issues in the recursive filter implementations, an adaptive-threshold starvation issue in peak detection, and a sample-rate mismatch in how I generated my test data — none of which were visible from unit testing alone; all of them only showed up once I ran the whole thing against real, sustained data instead of synthetic test vectors. I also found and fixed a fifth, smaller bit-width headroom bug in the derivative stage specifically by deliberately widening my testbenches' randomized coverage after noticing an inconsistency in how much of each port's actual range was being exercised.
+
+* Q: Why does tb_ecg_top.v check statistical properties instead of exact expected values, when your unit tests check exact values?
+A: "At the unit level, I control the input completely, so I can compute an exact expected output by hand or with an independent model. At the integration level, the input is a real, messy ECG recording — I don't have an independently-verified exact expected heart rate for every single sample. So the checks shift from 'does this match a known value' to 'does this satisfy properties that must hold if the pipeline is working' — spacing varies, values stay in physiologically plausible ranges, no undefined states propagate. That's a deliberate methodological shift, not a weaker standard."
+
+
+* Q: If you were deploying this on real hardware instead of simulation, what changes?
+A: "ecg_rom gets replaced by a real ADC interface module — reading a live ADC chip over SPI or a parallel bus, with sample_tick generated from the ADC's own conversion-complete signal instead of a clock divider counting toward a target rate. Nothing downstream of that needs to change, because every other module only depends on the ecg_sample + sample_tick handshake, not on where the data comes from. I'd also remove or gate off the debug ports, and I'd need to re-run static timing analysis at the real 100MHz clock target rather than the simulation-only 2kHz override, to confirm every path — especially the wider multiply in squaring and the multi-term sums in mwi/lpf/hpf — actually closes timing at that frequency."
+
+
+* Q: What about clock domain crossing, if the ADC has its own independent clock?
+A: "Right now this design assumes one clock domain throughout — sample_tick is a clock-enable, not a genuine second clock. If a real ADC's conversion-complete signal came from a truly independent clock domain, I'd need a proper synchronizer — at minimum a two-flop synchronizer on that signal before it's used to gate anything in this design's clock domain — to avoid metastability. That's a real gap between what I built (single clock domain, verified in simulation) and a fully real-world-ready design."
+
+
+* Q: What would you want before calling this production-ready for an actual medical device?
+A: "Quite a bit more, honestly — clinical validation against annotated ground truth with computed sensitivity/precision (which my MATLAB reference does, but the RTL hasn't been benchmarked the same rigorous way), multi-lead support for redundancy, lead-off and motion-artifact detection, and given it's a medical device, a much more formal verification and safety-case process than what I did here, which was thorough for a portfolio/interview project but not to a regulatory (e.g. IEC 62304) standard. I'd frame what I built as a solid, well-verified proof-of-concept of the signal-processing core, not a finished product."
