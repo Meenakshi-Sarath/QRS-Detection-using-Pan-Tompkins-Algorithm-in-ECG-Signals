@@ -374,3 +374,8 @@ So the '+1' pattern isn't a cost of a bad choice — it's the natural, correct c
 
 #### A fix: <br>
 While reviewing this module I noticed the irregularity check reads rr_diff in the same clock edge it's written via a non-blocking assignment — which means it's actually comparing against the previous beat's diff, not the current one, a one-cycle stale read.  The fix was to compute the diff as a combinational expression inline, using the still-valid old prev_rr, rather than storing it in a register and reading it back a cycle late — the same 'recompute pending value inline' pattern I'd already used correctly elsewhere in the pipeline, like the HPF's running sum.
+
+## Testbench 
+
+* pulse_and_capture task: drives hr/rr_interval/hr_valid=1 for one beat, waits one clock (the edge the DUT samples on), then captures rhythm_class/alarm immediately after (#1 delay to clear the NBA update region) — matching the module's "valid for one cycle only" behavior.
+* No independent reference model — correctness relies on hand-derived expected values, not a second, differently-implemented check.
