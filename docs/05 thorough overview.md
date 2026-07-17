@@ -334,3 +334,31 @@ Originally 200 ms (textbook value, 40 samples) — widened after integration tes
 The >>3 (÷8) exponential moving averages have coefficient 7/8, strictly inside the unit circle — not on it.
 Truncation error introduced each cycle decays away over time instead of integrating unboundedly, because the feedback gain is <1.
 Direct, useful contrast to draw against the LPF/HPF bug: same "recursive averaging" flavor, structurally totally different stability story.
+
+# HEART RATE CALCULATION 
+
+## RTL 
+
+* Outputs of this stage: heartrate (8 bits), heart_rate_valid flag(1/0)- needed because for first peak, we cant calculate hr or rr interval , rr_interval value in terms of samples not seconds(16 bits).
+* sample_counter counts samples since the last peak — this is literally the RR interval being measured in real time. last_rr stores the previous RR interval
+* Now at every sample_tick we obviously incrememnt sample_counter by 1 and if a peak is detected, we put current rr-interval into last_rr and new rr_interval will be sample_counter +1 (non blocking statements so the current sample has to be added extra: hence the +1)
+
+#### The issue with division
+* This module implicitly trusts peak_detect's refractory logic (minimum 60-sample spacing) to prevent pathologically small RR intervals from ever reaching this division; it's not independently defensive.
+* The core issue is dividing by a variable, data-dependent value, not a constant — so it can't be turned into a free shift the way the LPF/HPF's divide-by-32 was. My preferred fix would be to not compute BPM in RTL at all — output rr_interval (which is just a counter read, free) and let a downstream processor or display block compute BPM, since heart rate is a low-rate, human-facing output with no real-time constraint.
+* If it had to stay in RTL, I'd use Vivado's Divider Generator IP with an explicit multi-cycle handshake rather than trusting the bare / operator to synthesize into something that meets timing, since inferred combinational dividers are a common source of failed timing closure on FPGA.
+
+## Testbench
+
+* We have 2 tasks: run_interval(val1) and check(label,exp_hr,exp_rr)
+* run_interval basically runs and keeps the sample_tick high and peak 0 for val1 ticks and then peak is made high for one tick. It directly encodes "the interval between two peaks" as the task's parameter.
+* check: Simple directed comparison against expected hr/rr_interval values, with descriptive pass/fail logging via a string label.
+* Checks for cases of normal, bradycahrdia and tachycardia. while classification is not done, we are outputeed with the hr and rr values.
+
+### Why use non blocking statements everywhere in our project when we need to add the +1 factor to it?
+
+* In real silicon, every flip-flop in a clocked block samples its input at the same instant (the clock edge) and updates simultaneously. Non-blocking assignments (<=) mimic this exactly
+* If you use = for multiple registers in one always block, the order you write the statements in changes the result
+
+
+So the '+1' pattern isn't a cost of a bad choice — it's the natural, correct cost of accurately modeling one-cycle-latency pipeline registers, and non-blocking is what makes that model safe and predictable rather than order-dependent. I'd only reach for blocking assignments inside a combinational always block, where there's no clock edge and no risk of this kind of race.
