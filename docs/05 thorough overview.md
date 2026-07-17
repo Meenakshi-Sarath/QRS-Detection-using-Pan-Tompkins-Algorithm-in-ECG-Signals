@@ -339,6 +339,8 @@ Direct, useful contrast to draw against the LPF/HPF bug: same "recursive averagi
 
 # HEART RATE CALCULATION 
 
+<img width="1600" height="1258" alt="WhatsApp Image 2026-07-17 at 07 38 39" src="https://github.com/user-attachments/assets/30314760-6f14-418f-8b41-0ee6f2b42e4e" />
+
 ## RTL 
 
 * Outputs of this stage: heartrate (8 bits), heart_rate_valid flag(1/0)- needed because for first peak, we cant calculate hr or rr interval , rr_interval value in terms of samples not seconds(16 bits).
