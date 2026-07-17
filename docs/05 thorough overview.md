@@ -135,6 +135,8 @@ A low-frequency (slowly varying) signal barely changes at all across 6 samples �
 
 ### Where the cutoff frequency actually comes from
 
+<img width="250" height="251" alt="image" src="https://github.com/user-attachments/assets/1e1b46a4-3d44-4e75-9db0-16dd6c65210e" />
+
 #### Frequency response:
 * Imagine an experiment: feed a pure, single-frequency tone into your filter, measure how big the output wave is compared to the input.
 * For each frequency, you get one number: what fraction of the input amplitude survived. That collection of numbers, plotted against frequency, is the frequency response.
@@ -360,5 +362,15 @@ Direct, useful contrast to draw against the LPF/HPF bug: same "recursive averagi
 * In real silicon, every flip-flop in a clocked block samples its input at the same instant (the clock edge) and updates simultaneously. Non-blocking assignments (<=) mimic this exactly
 * If you use = for multiple registers in one always block, the order you write the statements in changes the result
 
-
 So the '+1' pattern isn't a cost of a bad choice — it's the natural, correct cost of accurately modeling one-cycle-latency pipeline registers, and non-blocking is what makes that model safe and predictable rather than order-dependent. I'd only reach for blocking assignments inside a combinational always block, where there's no clock edge and no risk of this kind of race.
+
+# ARRHYTHMIA CLASSIFICATION
+
+## RTL
+
+* A simple 3-bit classification code for pointing out irregular beats, normal, bradychardia and tachycardia.
+* So if the rr_diff between prev_rr_interval and new_rr_interval is > 25% of prev_rr_interval : classify as irregular rhythm
+* hr<60 bpm: bradychardia hr>100bpm is tachycardia.
+
+#### A fix: <br>
+While reviewing this module I noticed the irregularity check reads rr_diff in the same clock edge it's written via a non-blocking assignment — which means it's actually comparing against the previous beat's diff, not the current one, a one-cycle stale read.  The fix was to compute the diff as a combinational expression inline, using the still-valid old prev_rr, rather than storing it in a register and reading it back a cycle late — the same 'recompute pending value inline' pattern I'd already used correctly elsewhere in the pipeline, like the HPF's running sum.
