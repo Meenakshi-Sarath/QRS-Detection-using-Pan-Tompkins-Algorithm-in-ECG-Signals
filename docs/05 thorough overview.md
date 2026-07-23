@@ -50,6 +50,10 @@ No — and here's the important part: this is exactly what hpf exists to remove.
 * Now, we resample it to 200Hz using resample() function
 Internally, MATLAB's resample does this properly (not just "keep every Nth sample," which would distort the signal) — it applies an anti-aliasing low-pass filter before changing the rate, so frequency content above the new, lower Nyquist limit (100Hz here) doesn't fold back into the passband as spurious noise. After this line, signal genuinely represents the same waveform at 200 samples/second instead of 360, and Fs is updated to 200 so the rest of the script (and its print statements) stay consistent with reality.
 
+Before lowering the sampling rate, I must remove frequencies that the new sampling rate cannot represent. Otherwise they fold back into lower frequencies and appear as false signal components
+<img width="405" height="369" alt="image" src="https://github.com/user-attachments/assets/9bcc981b-77b6-47f3-8a31-7c8007a60540" />
+
+
 * Truncates to the first 4096 samples — MATLAB array indexing (1:4096) grabs elements 1 through 4096 (MATLAB is 1-indexed, unlike Verilog/most languages). Since this now happens after resampling, those 4096 samples represent 20.48 seconds of real time at the corrected 200Hz rate, matching what addr_width=12 in ecg_rom expects to hold.
 
 * We set the max and min value for 16 bit data (-32678 to 32677)
