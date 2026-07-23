@@ -61,7 +61,7 @@ waveform inspection required. Each testbench builds its own reference
 model (not copy-pasted from the DUT) and asserts a PASS/FAIL with a
 mismatch count.
 
-* Unit level: lpf, hpf, derivative, squaring, mwi, peak_detect, heart_rate, arrhythmia_classify — each verified in
+* Unit level: lpf, hpf, derivative, squaring, mwi, peak_detect, heart_rate, arrhythmia_classify- each verified in
 isolation against directed test cases, impulse/step responses where applicable, and randomized regression.
 * Integration level: tb_ecg_top.v runs the full chain against real MIT-BIH data (ecg.mem) and checks end-to-end behavior.
 R-peak spacing tracks the real signal, reported HR falls in a physiologically plausible range, and rhythm classification
